@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Insignia V1.1</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0f;
+            --panel-bg: #12121e;
+            --accent-color: #00ffcc;
+            --accent-glow: rgba(0, 255, 204, 0.2);
+            --text-main: #e2e2e9;
+            --text-muted: #787887;
+            --user-bubble: #1b1b2f;
+            --bot-bubble: #16222f;
+            --error-color: #ff3366;
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            height: -webkit-fill-available;
+        }
+        header {
+            flex-shrink: 0;
+            background-color: var(--panel-bg);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(0, 255, 204, 0.15);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            z-index: 10;
+        }
+        .header-left { display: flex; align-items: center; }
+        .sigil-container {
+            width: 36px; height: 36px; margin-right: 12px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .header-title {
+            font-size: 1.15rem; font-weight: 700; letter-spacing: 1.5px;
+            color: #ffffff; text-shadow: 0 0 8px var(--accent-glow);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .header-status {
+            font-size: 0.65rem; background: rgba(0, 255, 204, 0.1);
+            color: var(--accent-color); padding: 2px 6px; border-radius: 4px;
+            border: 1px solid rgba(0, 255, 204, 0.3); text-transform: uppercase;
+            font-weight: bold; letter-spacing: 0.5px;
+        }
+        .stop-audio-btn {
+            background: rgba(255, 51, 102, 0.15);
+            border: 1px solid rgba(255, 51, 102, 0.4); color: #ff6688;
+            padding: 4px 10px; border-radius: 12px; font-size: 0.75rem;
+            font-weight: 600; cursor: pointer; display: none; align-items: center;
+            gap: 4px; transition: all 0.2s ease;
+        }
+        .stop-audio-btn:active { transform: scale(0.95); }
+        .stop-audio-btn svg { fill: currentColor; }
+        .chat-viewport {
+            flex-grow: 1; overflow-y: auto; padding: 16px; display: flex;
+            flex-direction: column; gap: 14px;
+            background: linear-gradient(180deg, #0a0a0f 0%, #06060a 100%);
+            -webkit-overflow-scrolling: touch;
+        }
+        .chat-viewport::-webkit-scrollbar { width: 4px; }
+        .chat-viewport::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1); border-radius: 2px;
+        }
+        .message-row {
+            display: flex; width: 100%;
+            animation: fadeIn 0.25s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message-row.user { justify-content: flex-end; }
+        .message-bubble {
+            max-width: 85%; padding: 12px 16px; border-radius: 16px;
+            font-size: 0.95rem; line-height: 1.45; word-break: break-word;
+            white-space: pre-wrap; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        .message-row.user .message-bubble {
+            background-color: var(--user-bubble); color: #ffffff;
+            border-bottom-right-radius: 4px; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .message-row.bot .message-bubble {
+            background-color: var(--bot-bubble); color: var(--text-main);
+            border-bottom-left-radius: 4px; border: 1px solid rgba(0, 255, 204, 0.08);
+            padding-bottom: 28px;
+        }
+        .message-row.error .message-bubble {
+            background-color: rgba(255, 51, 102, 0.1); color: #ff6688;
+            border: 1px solid rgba(255, 51, 102, 0.25);
+            font-family: monospace; font-size: 0.85rem;
+        }
+        .replay-speech-btn {
+            position: absolute; bottom: 6px; right: 8px; background: transparent;
+            border: none; color: var(--text-muted); cursor: pointer; padding: 4px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            transition: color 0.2s, transform 0.1s;
+        }
+        .replay-speech-btn:hover { color: var(--accent-color); }
+        .replay-speech-btn:active { transform: scale(0.9); }
+        .replay-speech-btn svg { fill: currentColor; width: 14px; height: 14px; }
+        .typing-indicator {
+            display: flex; align-items: center; gap: 4px; padding: 6px 4px;
+        }
+        .typing-dot {
+            width: 7px; height: 7px; background-color: var(--accent-color);
+            border-radius: 50%; opacity: 0.4; animation: pulse 1.2s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(0.8); opacity: 0.4; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+        .input-dock {
+            flex-shrink: 0; background-color: var(--panel-bg);
+            border-top: 1px solid rgba(0, 255, 204, 0.15);
+            padding: 10px 12px calc(10px + var(--safe-bottom)) 12px;
+            z-index: 10; box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+        }
+        .listening-status {
+            font-size: 0.75rem; color: var(--accent-color); margin-bottom: 6px;
+            padding-left: 14px; display: none; align-items: center; gap: 6px;
+            letter-spacing: 0.5px;
+        }
+        .listening-status.active { display: flex; }
+        .listening-pulse-dot {
+            width: 6px; height: 6px; background-color: var(--accent-color);
+            border-radius: 50%; animation: pulse 1s infinite ease-in-out;
+        }
+
+        .voice-notice {
+            margin: 0 0 8px 14px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            display: none;
+            line-height: 1.35;
+        }
+
+        .voice-notice.active {
+            display: block;
+        }
+
+        .input-wrapper {
+            display: flex; align-items: flex-end; background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px;
+            padding: 4px 6px 4px 14px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .input-wrapper:focus-within {
+            border-color: rgba(0, 255, 204, 0.6);
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.15);
+        }
+        textarea {
+            flex-grow: 1; background: none; border: none; outline: none; color: #ffffff;
+            font-family: inherit; font-size: 1rem; line-height: 1.4; padding: 8px 0;
+            resize: none; max-height: 120px; height: 38px; overflow-y: auto;
+        }
+        textarea::placeholder { color: var(--text-muted); }
+        .dock-btn {
+            background-color: transparent; border: none; width: 36px; height: 36px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; margin-left: 4px; flex-shrink: 0; margin-bottom: 2px;
+            transition: background-color 0.2s, transform 0.1s, color 0.2s;
+        }
+        .dock-btn:active { transform: scale(0.92); }
+        .dock-btn svg { fill: var(--accent-color); transition: fill 0.2s; }
+        .dock-btn:disabled { cursor: not-allowed; opacity: 0.4; }
+        .dock-btn:disabled svg { fill: var(--text-muted); }
+        .mic-btn svg { fill: var(--text-muted); }
+        .mic-btn.listening {
+            background-color: rgba(0, 255, 204, 0.15);
+            animation: micGlow 1.5s infinite ease-in-out;
+        }
+        .mic-btn.listening svg { fill: var(--accent-color); }
+        @keyframes micGlow {
+            0%, 100% { box-shadow: 0 0 4px var(--accent-glow); }
+            50% { box-shadow: 0 0 12px rgba(0, 255, 204, 0.6); }
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+<header>
+<div class="header-left">
+<div class="sigil-container">
+<svg width="100%" height="100%" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+<defs><linearGradient id="sigilGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#00ffcc"/><stop offset="100%" stop-color="#0099ff"/>
+</linearGradient></defs>
+<polygon points="50,5 89,27.5 89,72.5 50,95 11,72.5 11,27.5" fill="none" stroke="url(#sigilGrad)" stroke-width="2.5" opacity="0.4"/>
+<polygon points="50,20 76,35 76,65 50,80 24,65 24,35" fill="none" stroke="url(#sigilGrad)" stroke-width="1.5" opacity="0.7"/>
+<path d="M 50,5 L 50,32 M 50,95 L 50,68 M 11,27.5 L 35,41.5 M 89,27.5 L 65,41.5 M 11,72.5 L 35,58.5 M 89,72.5 L 65,58.5" stroke="url(#sigilGrad)" stroke-width="2"/>
+<polygon points="50,38 62,50 50,62 38,50" fill="url(#sigilGrad)"/><circle cx="50" cy="50" r="3" fill="#000000"/>
+</svg>
+</div>
+<div class="header-title">INSIGNIA <span class="header-status">v1.1</span></div>
+</div>
+<button id="stopAudioBtn" class="stop-audio-btn" title="Stop speech">
+<svg width="12" height="12" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop Speech
+</button>
+</header>
+<main class="chat-viewport" id="chatViewport">
+<div class="message-row bot">
+    <div class="message-bubble">**Insignia V1.1** initialized. Your personal AI assistant is ready. Type a message or click the microphone to speak.</div>
+</div>
+</main>
+<footer class="input-dock">
+<div id="voiceNotice" class="voice-notice" role="status" aria-live="polite"></div>
+<div id="listeningStatus" class="listening-status"><div class="listening-pulse-dot"></div><span>Listening...</span></div>
+<div class="input-wrapper">
+<textarea id="messageInput" placeholder="Type or speak a message..." rows="1"></textarea>
+<button id="micBtn" class="dock-btn mic-btn" aria-label="Voice input" title="Toggle voice input" type="button">
+<svg width="20" height="20" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+</button>
+<button id="sendBtn" class="dock-btn" aria-label="Send message" title="Send message">
+<svg width="20" height="20" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+</button>
+</div>
+</footer>
+</div>
+<script>
+const WORKER_URL = 'https://crimson-frost-1e90.wildfireict.workers.dev';
+const SPEECH_LANG = navigator.language || 'en-US';
+const chatViewport = document.getElementById('chatViewport');
+const messageInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const micBtn = document.getElementById('micBtn');
+const stopAudioBtn = document.getElementById('stopAudioBtn');
+const listeningStatus = document.getElementById('listeningStatus');
+let isProcessing = false;
+
+messageInput.addEventListener('input', function(){ adjustInputHeight(this); });
+function adjustInputHeight(elem){
+    elem.style.height='38px';
+    const scrollHeight=elem.scrollHeight;
+    if(scrollHeight>38) elem.style.height=Math.min(scrollHeight,120)+'px';
+}
+function scrollToBottom(){
+    setTimeout(()=>chatViewport.scrollTo({top:chatViewport.scrollHeight,behavior:'smooth'}),60);
+}
+
+const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+const hasTTS = 'speechSynthesis' in window;
+
+let recognition = null;
+let isListening = false;
+let currentUtterance = null;
+let currentSpeechText = '';
+let recognitionFinalTranscript = '';
+let recognitionBaseText = '';
+let recognitionHadError = false;
+
+const voiceNotice = document.getElementById('voiceNotice');
+
+function setVoiceNotice(message, active = true) {
+    voiceNotice.textContent = message || '';
+    voiceNotice.classList.toggle('active', active && !!message);
+}
+
+function clearVoiceNotice() {
+    setVoiceNotice('', false);
+}
+
+function stopListeningState() {
+    isListening = false;
+    micBtn.classList.remove('listening');
+    listeningStatus.classList.remove('active');
+}
+
+function initSpeechRecognition() {
+    recognition = new SpeechRecognition();
+
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = SPEECH_LANG;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+        isListening = true;
+        recognitionHadError = false;
+        recognitionFinalTranscript = '';
+        recognitionBaseText = messageInput.value.trim();
+
+        stopSpeech();
+        clearVoiceNotice();
+
+        micBtn.classList.add('listening');
+        listeningStatus.classList.add('active');
+    };
+
+    recognition.onresult = (event) => {
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const result = event.results[i];
+            const transcript = result[0].transcript;
+
+            if (result.isFinal) {
+                recognitionFinalTranscript += transcript;
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+
+        const spokenText = (recognitionFinalTranscript + interimTranscript).trim();
+
+        if (recognitionBaseText && spokenText) {
+            messageInput.value = recognitionBaseText + ' ' + spokenText;
+        } else if (spokenText) {
+            messageInput.value = spokenText;
+        } else {
+            messageInput.value = recognitionBaseText;
+        }
+
+        adjustInputHeight(messageInput);
+    };
+
+    recognition.onerror = (event) => {
+        recognitionHadError = true;
+        console.warn('Speech recognition error:', event.error);
+
+        const messages = {
+            'not-allowed': 'Microphone permission was denied. Allow microphone access in your browser settings and try again.',
+            'service-not-allowed': 'Speech recognition is not allowed by this browser or device.',
+            'audio-capture': 'No working microphone was detected.',
+            'network': 'The browser speech-recognition service reported a network error.',
+            'no-speech': 'No speech was detected. Press the microphone and try again.',
+            'aborted': 'Voice input was stopped.'
+        };
+
+        if (messages[event.error]) {
+            setVoiceNotice(messages[event.error], true);
+        } else {
+            setVoiceNotice('Voice input encountered an error. Please try again.', true);
+        }
+
+        stopListeningState();
+    };
+
+    recognition.onend = () => {
+        stopListeningState();
+
+        if (!recognitionHadError) {
+            clearVoiceNotice();
+            messageInput.focus();
+            adjustInputHeight(messageInput);
+        }
+    };
+}
+
+
+async function requestMicrophonePermission() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setVoiceNotice('This browser does not support microphone permission requests. Please use Chrome or another supported browser.', true);
+        return false;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+
+        // Permission was granted. Clear any previous warning and continue to STT.
+        clearVoiceNotice();
+        return true;
+    } catch (error) {
+        const name = error && error.name ? error.name : 'unknown';
+
+        if (name === 'NotAllowedError' || name === 'SecurityError') {
+            setVoiceNotice(
+                'Microphone access was denied. Allow Microphone for this page in Chrome/Android settings, then tap the mic again.',
+                true
+            );
+        } else if (name === 'NotFoundError') {
+            setVoiceNotice('No microphone was found on this device.', true);
+        } else if (name === 'NotReadableError') {
+            setVoiceNotice('The microphone is currently being used by another app. Close it and try again.', true);
+        } else if (name === 'OverconstrainedError') {
+            setVoiceNotice('The available microphone could not be opened.', true);
+        } else {
+            setVoiceNotice('Could not access the microphone. Please check your browser and device microphone permissions.', true);
+        }
+
+        return false;
+    }
+}
+
+async function toggleListening() {
+    if (!recognition) {
+        setVoiceNotice('Speech recognition is not available in this browser. Try Chrome on Android or a supported desktop browser.', true);
+        return;
+    }
+
+    if (isListening) {
+        try { recognition.stop(); } catch (e) {}
+        return;
+    }
+
+    // Explicitly request microphone access first. This gives Chrome a chance
+    // to display its native permission prompt before SpeechRecognition starts.
+    const permissionGranted = await requestMicrophonePermission();
+    if (!permissionGranted) return;
+
+    try {
+        recognition.start();
+    } catch (error) {
+        // start() can throw if recognition is already starting/running.
+        if (!isListening) {
+            setVoiceNotice('Could not start voice input. Please tap the mic again.', true);
+        }
+    }
+}
+
+if (!SpeechRecognition) {
+    micBtn.style.display = 'none';
+    setVoiceNotice(
+        'Voice input is not supported by this browser. You can still use Insignia normally.',
+        true
+    );
+} else {
+    initSpeechRecognition();
+}
+
+micBtn.addEventListener('click', toggleListening);
+
+function sanitizeTextForSpeech(text) {
+    let clean = String(text || '');
+
+    // Remove fenced code blocks completely.
+    clean = clean.replace(/```[\s\S]*?```/g, ' ');
+
+    // Remove inline code formatting but retain the readable text.
+    clean = clean.replace(/`([^`]+)`/g, '$1');
+
+    // Remove HTML/XML tags.
+    clean = clean.replace(/<[^>]*>/g, ' ');
+
+    // Remove common Markdown structure/decoration.
+    clean = clean.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1');
+    clean = clean.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+    clean = clean.replace(/^\s{0,3}#{1,6}\s+/gm, '');
+    clean = clean.replace(/^\s*>\s?/gm, '');
+    clean = clean.replace(/^\s*[-*+]\s+/gm, '');
+    clean = clean.replace(/^\s*\d+\.\s+/gm, '');
+    clean = clean.replace(/\*\*([^*]+)\*\*/g, '$1');
+    clean = clean.replace(/__([^_]+)__/g, '$1');
+    clean = clean.replace(/\*([^*]+)\*/g, '$1');
+    clean = clean.replace(/_([^_]+)_/g, '$1');
+    clean = clean.replace(/~~([^~]+)~~/g, '$1');
+
+    // Remove remaining Markdown punctuation and normalize whitespace.
+    clean = clean.replace(/[*_~#|]/g, ' ');
+    clean = clean.replace(/\s+/g, ' ').trim();
+
+    return clean;
+}
+
+function chooseSpeechVoice(language) {
+    if (!hasTTS) return null;
+
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    const normalized = language.toLowerCase();
+    const baseLanguage = normalized.split('-')[0];
+
+    return (
+        voices.find(v => v.lang && v.lang.toLowerCase() === normalized) ||
+        voices.find(v => v.lang && v.lang.toLowerCase().startsWith(baseLanguage + '-')) ||
+        voices.find(v => v.lang && v.lang.toLowerCase() === baseLanguage) ||
+        null
+    );
+}
+
+function speakText(text) {
+    if (!hasTTS) return;
+
+    const cleanText = sanitizeTextForSpeech(text);
+    if (!cleanText) return;
+
+    stopSpeech();
+
+    currentSpeechText = cleanText;
+    currentUtterance = new SpeechSynthesisUtterance(cleanText);
+    currentUtterance.lang = SPEECH_LANG;
+
+    const selectedVoice = chooseSpeechVoice(SPEECH_LANG);
+    if (selectedVoice) {
+        currentUtterance.voice = selectedVoice;
+    }
+
+    currentUtterance.rate = 1;
+    currentUtterance.pitch = 1;
+    currentUtterance.volume = 1;
+
+    currentUtterance.onstart = () => {
+        stopAudioBtn.style.display = 'inline-flex';
+    };
+
+    currentUtterance.onend = () => {
+        stopAudioBtn.style.display = 'none';
+        currentUtterance = null;
+        currentSpeechText = '';
+    };
+
+    currentUtterance.onerror = (event) => {
+        console.warn('Speech synthesis error:', event.error);
+        stopAudioBtn.style.display = 'none';
+        currentUtterance = null;
+        currentSpeechText = '';
+    };
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(currentUtterance);
+}
+
+function stopSpeech() {
+    if (hasTTS) {
+        window.speechSynthesis.cancel();
+    }
+
+    stopAudioBtn.style.display = 'none';
+    currentUtterance = null;
+    currentSpeechText = '';
+}
+
+if (hasTTS && 'onvoiceschanged' in window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = () => {
+        // Voice list is populated asynchronously on some browsers.
+    };
+} else if (!hasTTS) {
+    stopAudioBtn.style.display = 'none';
+}
+
+stopAudioBtn.addEventListener('click', stopSpeech);
+
+function appendMessage(text,type){
+    const row=document.createElement('div');row.classList.add('message-row',type);
+    const bubble=document.createElement('div');bubble.classList.add('message-bubble');bubble.textContent=text;
+    if(type==='bot'&&hasTTS){
+        const replayBtn=document.createElement('button');
+        replayBtn.classList.add('replay-speech-btn');replayBtn.title='Replay Speech';replayBtn.setAttribute('aria-label','Replay Speech');
+        replayBtn.innerHTML='<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+        replayBtn.onclick=()=>speakText(text);bubble.appendChild(replayBtn);
+    }
+    row.appendChild(bubble);chatViewport.appendChild(row);scrollToBottom();return row;
+}
+let currentIndicator=null;
+function showIndicator(){
+    const row=document.createElement('div');row.classList.add('message-row','bot');
+    const bubble=document.createElement('div');bubble.classList.add('message-bubble');
+    const indicator=document.createElement('div');indicator.classList.add('typing-indicator');
+    for(let i=0;i<3;i++){const dot=document.createElement('div');dot.classList.add('typing-dot');indicator.appendChild(dot);}
+    bubble.appendChild(indicator);row.appendChild(bubble);chatViewport.appendChild(row);currentIndicator=row;scrollToBottom();
+}
+function removeIndicator(){if(currentIndicator){currentIndicator.remove();currentIndicator=null;}}
+function setLockState(locked){
+    isProcessing = locked;
+    sendBtn.disabled = locked;
+    micBtn.disabled = locked;
+    messageInput.disabled = locked;
+
+    if (locked) {
+        stopListeningState();
+    }
+
+    if (!locked) {
+        setTimeout(() => messageInput.focus(), 50);
+    }
+}
+async function handleSubmission() {
+    if (isProcessing) return;
+
+    if (isListening && recognition) {
+        recognition.stop();
+    }
+
+    stopSpeech();
+
+    const text = messageInput.value.trim();
+    if (!text) return;
+
+    appendMessage(text, 'user');
+    messageInput.value = '';
+    messageInput.style.height = '38px';
+
+    setLockState(true);
+    showIndicator();
+
+    try {
+        const response = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: text }),
+            mode: 'cors',
+            credentials: 'omit'
+        });
+
+        removeIndicator();
+
+        const rawBody = await response.text();
+
+        if (!response.ok) {
+            try {
+                const errJson = JSON.parse(rawBody);
+                appendMessage(
+                    `Error (${response.status}): ${errJson.error || errJson.message || rawBody}`,
+                    'error'
+                );
+            } catch (e) {
+                appendMessage(
+                    `Server Error (${response.status}): ${rawBody || response.statusText}`,
+                    'error'
+                );
+            }
+
+            setLockState(false);
+            return;
+        }
+
+        let botMessageText = '';
+
+        try {
+            const parsedData = JSON.parse(rawBody);
+
+            if (parsedData.response) {
+                botMessageText = parsedData.response;
+            } else if (parsedData.error) {
+                botMessageText = `Error: ${parsedData.error}`;
+            } else {
+                botMessageText = JSON.stringify(parsedData, null, 2);
+            }
+        } catch (jsonErr) {
+            botMessageText = rawBody;
+        }
+
+        appendMessage(botMessageText, 'bot');
+
+        // Speech happens locally in the browser; the Worker response remains unchanged.
+        speakText(botMessageText);
+
+    } catch (networkError) {
+        removeIndicator();
+
+        appendMessage(
+            `Connection Failure / Could not fetch:\n\n` +
+            `• Verification Details: ${networkError.message || networkError}\n` +
+            `• Possible Cause: Cloudflare Worker lack of cross-origin 'Access-Control-Allow-Origin' validation response headers.\n` +
+            `• Action Required: Confirm that cross-origin parsing filters are configured on endpoint: ${WORKER_URL}`,
+            'error'
+        );
+    } finally {
+        setLockState(false);
+    }
+}
+
+sendBtn.addEventListener('click',handleSubmission);
+messageInput.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSubmission();}});
+if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',()=>{
+        document.body.style.height=window.visualViewport.height+'px';scrollToBottom();
+    });
+}
+</script>
+</body>
+</html>`;
